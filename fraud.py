@@ -1,17 +1,24 @@
 import numpy as np
+import  numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 # %matplotlib inline
 
+data = pd.read_csv('/new_file.csv')
 
-data = pd.read_csv('new_file.csv', delimiter=',')
 data.head()
 
 data.info()
 
 data.describe()
 
+data.isnull().sum() #checking for null values/missing values
+
+data['isFraud'].value_counts() #checking for class imbalance
+#check 0-> not fraud, 1-> fraud
+
+#seperating categorical and numerical variables
 obj = (data.dtypes == 'object')
 object_cols = list(obj[obj].index)
 print("Categorical variables:", len(object_cols))
@@ -24,62 +31,73 @@ fl = (data.dtypes == 'float')
 fl_cols = list(fl[fl].index)
 print("Float variables:", len(fl_cols))
 
-sns.countplot(x='type', data=data)
+#seperating data for analysis
 
-sns.barplot(x='type', y='amount', data=data)
+legit= data[data['isFraud'] == 0]
+fraud = data[data['isFraud'] == 1]
 
-data['isFraud'].value_counts()
+print("Legit transactions:", len(legit))
+print("Fraud transactions:", len(fraud))
 
-plt.figure(figsize=(15, 6))
-sns.distplot(data['step'], bins=50)
+new_dataset= pd.concat([legit.sample(), fraud], axis=0) #concatenating row wise
+#axis - >0 row   axis ->1 column
 
-plt.figure(figsize=(12, 6))
-sns.heatmap(data.apply(lambda x: pd.factorize(x)[0]).corr(),
-                        cmap='BrBG',
-                        fmt='.2f',
-                        linewidths=2,
-                        annot=True)
+new_dataset.head()
 
-type_new = pd.get_dummies(data['type'], drop_first=True)
-data_new = pd.concat([data, type_new], axis=1)
-data_new.head()
+new_dataset['isFraud'].value_counts()
 
-X = data_new.drop(['isFraud', 'type', 'nameOrig', 'nameDest'], axis=1)
-y = data_new['isFraud']
 
-X.shape, y.shape
+new_dataset.head()
+new_dataset.tail()
+new_dataset['isFraud'].value_counts()
+
+#splitting data into training sets and data
+
+X = new_dataset.drop(['isFraud', 'type', 'nameOrig', 'nameDest'], axis=1)
+y = new_dataset['isFraud']
 
 from sklearn.model_selection import train_test_split
-X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.3, random_state=42)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=44)
+
+print("X_test","\n",X_test)
+
+print("y_test","\n",y_test)
+
+print("X_train","\n",X_train)
+
+print("y_train","\n",y_train)
 
 
-#different models
+#training the model
+
 from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score as ras
-from sklearn.linear_model import LogisticRegression
-from sklearn.svm import SVC
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import LinearSVC
+model = [XGBClassifier()]
 
-models = [LogisticRegression(), XGBClassifier(),
-                RandomForestClassifier(n_estimators=7,criterion='entropy',
-                                                            andom_state=7)]
+for i in range(len(model)):
+	model[i].fit(X_train, y_train)
+	print(f'{model[i]} : ')
 
-for i in range(len(models)):
-        models[i].fit(X_train, y_train)
-        print(f'{models[i]} : ')
+	train_preds = model[i].predict_proba(X_train)[:, 1]
+	print('Training Accuracy : ', ras(y_train, train_preds))
 
-        train_preds = models[i].predict_proba(X_train)[:, 1]
-        print('Training Accuracy : ', ras(y_train, train_preds))
+	y_preds = model[i].predict_proba(X_test)[:, 1]
+	print('Validation Accuracy : ', ras(y_test, y_preds))
+	print()
 
-        y_preds = models[i].predict_proba(X_test)[:, 1]
-        print('Validation Accuracy : ', ras(y_test, y_preds))
-        print()
-
-from sklearn.metrics import ConfusionMatrixDisplay
-import matplotlib.pyplot as plt
+ #ACCURACY
 
 
 
-plt.show()
+y_train_pred = model[0].predict(X_train)
+y_test_pred = model[0].predict(X_test)
+
+
+train_accuracy = accuracy_score(y_train, y_train_pred)
+test_accuracy = accuracy_score(y_test, y_test_pred)
+
+
+print("Training Accuracy:", train_accuracy)
+print("Testing Accuracy:", test_accuracy)
